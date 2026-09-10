@@ -13,6 +13,9 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ZH } from './zh-CN-map.mjs';
+// Reuse the XML end-of-line normalisation (CRLF / lone CR -> LF) of the .qm
+// compiler: the catalogue must not depend on how git checked the files out.
+import { normaliseNewlines } from './build-qm.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const desktopDir = join(here, '..');
@@ -28,7 +31,7 @@ const escapeText = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace
 const escapeAttr = (s) => escapeText(s).replace(/"/g, '&quot;');
 
 // --- Parse the English catalogue (authoritative list of live tr() strings) ---
-const xml = readFileSync(enTs, 'utf8');
+const xml = normaliseNewlines(readFileSync(enTs, 'utf8'));
 const contexts = [];
 for (const cm of xml.matchAll(/<context>([\s\S]*?)<\/context>/g)) {
     const body = cm[1];
@@ -48,6 +51,12 @@ if (!contexts.length) throw new Error(`no contexts found in ${enTs}`);
 
 const total = contexts.reduce((n, c) => n + c.messages.length, 0);
 
+// The map is written by hand, so its keys and translations are normalised too:
+// a '\r\n' copied from the German source (or from a CRLF editor) would otherwise
+// never match the LF-only source text of the catalogue.
+const zhMap = new Map(Object.entries(ZH)
+    .map(([key, value]) => [normaliseNewlines(key), typeof value === 'string' ? normaliseNewlines(value) : value]));
+
 // --- Render the Chinese catalogue -------------------------------------------
 const lines = [];
 lines.push('<?xml version="1.0" encoding="utf-8"?>');
@@ -66,7 +75,7 @@ for (const context of contexts) {
             lines.push(`        <location filename="${escapeAttr(file)}"${line}/>`);
         }
         lines.push(`        <source>${escapeText(message.source)}</source>`);
-        const zh = ZH[message.source];
+        const zh = zhMap.get(message.source);
         if (typeof zh === 'string' && zh.length) {
             lines.push(`        <translation>${escapeText(zh)}</translation>`);
             translated++;
@@ -84,13 +93,15 @@ const output = lines.join('\n');
 
 // Source strings that are mapped but no longer exist in the catalogue.
 const live = new Set(contexts.flatMap((c) => c.messages.map((m) => m.source)));
-const stale = Object.keys(ZH).filter((k) => !live.has(k));
+const stale = [...zhMap.keys()].filter((k) => !live.has(k));
 
 const check = process.argv.includes('--check');
 if (check) {
     let current = '';
     try { current = readFileSync(outTs, 'utf8'); } catch { /* missing */ }
-    if (current !== output) {
+    // Compare content, not line endings: a Windows checkout with
+    // core.autocrlf=true hands us CRLF while the generated file is LF.
+    if (normaliseNewlines(current) !== output) {
         console.error(`${outTs} is out of date — run: node tools/build-ts.mjs`);
         process.exit(1);
     }

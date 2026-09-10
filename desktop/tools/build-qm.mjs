@@ -59,10 +59,19 @@ export function elfHash(text) {
     return h >>> 0 || 1; // elfHash_finish(): a zero hash becomes 1
 }
 
+// XML 1.0 §2.11 (end-of-line handling): a conforming parser normalises CRLF and
+// a lone CR to LF before the text reaches the application. Qt's lrelease does
+// exactly that, so the same catalogue must compile to the same .qm whether git
+// checked it out as CRLF (Windows, core.autocrlf=true) or as LF (CI, fresh
+// clone). Without this the CR stays inside multi-line source strings and the
+// compiled message can never match the LF-only string the C++ code builds at
+// runtime — the message would silently stay German.
+export const normaliseNewlines = (s) => s.replace(/\r\n?/g, '\n');
+
 export function parseTs(xml) {
     // lupdate writes UTF-8 without a BOM, but accepting one costs nothing and
     // avoids a confusing parse failure on hand-edited files.
-    const text = xml.charCodeAt(0) === 0xfeff ? xml.slice(1) : xml;
+    const text = normaliseNewlines(xml.charCodeAt(0) === 0xfeff ? xml.slice(1) : xml);
     const messages = [];
     for (const cm of text.matchAll(/<context>([\s\S]*?)<\/context>/g)) {
         const body = cm[1];
