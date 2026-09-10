@@ -40,8 +40,9 @@ public:
     QByteArray windowGeometry() const;
     void setWindowGeometry(const QByteArray &geometry);
 
-    // UI language, app-global (host-level). "en" (default) loads the bundled
-    // English translation; "de" uses the untranslated German source strings.
+    // UI language, app-global (host-level). "en" (default) and "zh" load the
+    // bundled English/Chinese translations; "de" uses the untranslated German
+    // source strings. The available languages live in main.cpp kLanguages.
     QString language() const;
     void setLanguage(const QString &language);
 

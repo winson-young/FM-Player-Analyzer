@@ -11,8 +11,8 @@ tactic explorer, full national-team mode, transfer/loan management, and the
 role/tactic editors. Legacy databases are migrated via
 Settings → Database → "Import legacy database".
 
-The interface is in English by default; a German translation is available under
-the **Language** menu (applied after a restart).
+The interface is in English by default; **German** and **Simplified Chinese**
+are available under the **Language** menu (applied after a restart).
 
 ## Build requirements
 
@@ -60,3 +60,22 @@ the staging folder works as a portable install. The app version comes from
 - `src/app/` — `fmplayeranalyzer` executable: Qt Widgets UI.
 - `src/tests/` — Qt Test unit tests and golden-master tests (`ctest`).
 - `installer/` — Inno Setup script (built by `scripts/package.ps1`).
+
+## Translations
+
+The `tr()` source strings are German. English and Simplified Chinese are
+compiled into the binary as `.qm` files and selected by language code in
+`main.cpp` (German needs no catalogue — it *is* the source text).
+
+- `translations/fmplayeranalyzer_en.ts` — hand-maintained, updated with
+  `lupdate src -ts translations/fmplayeranalyzer_en.ts -no-obsolete`.
+- `translations/fmplayeranalyzer_zh_CN.ts` — generated from the German source
+  strings plus the translation map in `tools/zh-CN-map.mjs`.
+- `tools/build-ts.mjs` — regenerates the Chinese catalogue (every message of the
+  English one, so it can never drift); `--check` fails if it is out of date.
+- `tools/build-qm.mjs` — compiles a `.ts` into a Qt `.qm`. CMake uses Qt's
+  `lrelease` when the LinguistTools are available and falls back to this
+  compiler otherwise, so a checkout without Qt still builds.
+- `src/tests/test_translations.mjs` — verifies catalogue coverage, placeholder
+  integrity and the compiled `.qm` (via a reader that implements Qt's lookup
+  algorithm). Runs from `ctest` when `node` is on `PATH`.

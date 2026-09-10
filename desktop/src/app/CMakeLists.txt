@@ -92,22 +92,50 @@ target_link_libraries(fmplayeranalyzer PRIVATE
 )
 
 # --- Translations -----------------------------------------------------------
-# The source strings are German; English is shipped as a compiled .qm loaded by
-# default (German = source fallback, no translator). lrelease compiles the
-# hand-maintained .ts at build time and the result is embedded under
-# :/i18n/fmplayeranalyzer_en.qm. Regenerate the .ts after adding tr() strings:
+# The source strings are German; English and Chinese are shipped as compiled
+# .qm files loaded by language code (see main.cpp). "de" needs no .qm at all
+# because the untranslated source strings already are German.
+#
+# lrelease compiles the hand-maintained .ts files when Qt's LinguistTools are
+# present; otherwise the deterministic compiler in tools/build-qm.mjs does it,
+# so a checkout without a Qt installation still builds. Regenerate the .ts files
+# after adding tr() strings:
 #   lupdate src -ts translations/fmplayeranalyzer_en.ts -no-obsolete
-set(FM_TS_FILE ${CMAKE_SOURCE_DIR}/translations/fmplayeranalyzer_en.ts)
-set(FM_QM_FILE ${CMAKE_CURRENT_BINARY_DIR}/fmplayeranalyzer_en.qm)
-add_custom_command(
-    OUTPUT ${FM_QM_FILE}
-    COMMAND Qt6::lrelease ${FM_TS_FILE} -qm ${FM_QM_FILE}
-    DEPENDS ${FM_TS_FILE}
-    VERBATIM
-    COMMENT "Compiling translations (lrelease)"
+#   node tools/build-ts.mjs            # Chinese catalogue from tools/zh-CN-map.mjs
+if(TARGET Qt6::lrelease)
+    set(FM_LRELEASE_COMMAND Qt6::lrelease)
+    set(FM_QM_TOOL "")
+else()
+    find_program(FM_NODE_EXECUTABLE NAMES node node.exe)
+    if(NOT FM_NODE_EXECUTABLE)
+        message(FATAL_ERROR "Neither Qt6::lrelease nor node was found - cannot compile the translations.")
+    endif()
+    set(FM_QM_TOOL ${CMAKE_SOURCE_DIR}/tools/build-qm.mjs)
+    set(FM_LRELEASE_COMMAND ${FM_NODE_EXECUTABLE} ${FM_QM_TOOL})
+endif()
+
+set(FM_TRANSLATIONS
+    en:${CMAKE_SOURCE_DIR}/translations/fmplayeranalyzer_en.ts
+    zh_CN:${CMAKE_SOURCE_DIR}/translations/fmplayeranalyzer_zh_CN.ts
 )
-set_source_files_properties(${FM_QM_FILE} PROPERTIES QT_RESOURCE_ALIAS fmplayeranalyzer_en.qm)
+set(FM_QM_FILES "")
+foreach(FM_ENTRY IN LISTS FM_TRANSLATIONS)
+    string(REPLACE ":" ";" FM_ENTRY_PARTS "${FM_ENTRY}")
+    list(GET FM_ENTRY_PARTS 0 FM_LANGUAGE)
+    list(GET FM_ENTRY_PARTS 1 FM_TS_FILE)
+    set(FM_QM_FILE ${CMAKE_CURRENT_BINARY_DIR}/fmplayeranalyzer_${FM_LANGUAGE}.qm)
+    add_custom_command(
+        OUTPUT ${FM_QM_FILE}
+        COMMAND ${FM_LRELEASE_COMMAND} ${FM_TS_FILE} -qm ${FM_QM_FILE}
+        DEPENDS ${FM_TS_FILE} ${FM_QM_TOOL}
+        VERBATIM
+        COMMENT "Compiling ${FM_LANGUAGE} translation"
+    )
+    set_source_files_properties(${FM_QM_FILE} PROPERTIES
+        QT_RESOURCE_ALIAS fmplayeranalyzer_${FM_LANGUAGE}.qm)
+    list(APPEND FM_QM_FILES ${FM_QM_FILE})
+endforeach()
 qt_add_resources(fmplayeranalyzer "translations"
     PREFIX "/i18n"
-    FILES ${FM_QM_FILE}
+    FILES ${FM_QM_FILES}
 )

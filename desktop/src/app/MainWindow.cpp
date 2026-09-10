@@ -343,7 +343,8 @@ void MainWindow::buildMenuBar()
     };
     for (const LangOption &option :
          {LangOption{QStringLiteral("en"), QStringLiteral("English")},
-          LangOption{QStringLiteral("de"), QStringLiteral("Deutsch")}}) {
+          LangOption{QStringLiteral("de"), QStringLiteral("Deutsch")},
+          LangOption{QStringLiteral("zh"), QStringLiteral("简体中文")}}) {
         auto *action = languageMenu->addAction(option.label);
         action->setCheckable(true);
         action->setChecked(option.code == current

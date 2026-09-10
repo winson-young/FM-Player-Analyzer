@@ -35,6 +35,9 @@ jobs:
       - name: Setup Ninja
         uses: seanmiddleditch/gha-setup-ninja@v5
 
+      - name: Check translation catalogues
+        run: node desktop/tools/build-ts.mjs --check
+
       - name: Configure
         run: cmake -S desktop -B build -G Ninja -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR"
 
