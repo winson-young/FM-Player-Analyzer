@@ -120,14 +120,32 @@ set(FM_TRANSLATIONS
 )
 set(FM_QM_FILES "")
 foreach(FM_ENTRY IN LISTS FM_TRANSLATIONS)
-    string(REPLACE ":" ";" FM_ENTRY_PARTS "${FM_ENTRY}")
-    list(GET FM_ENTRY_PARTS 0 FM_LANGUAGE)
-    list(GET FM_ENTRY_PARTS 1 FM_TS_FILE)
+    # Split "<language>:<path>" at the FIRST colon only. A plain
+    # string(REPLACE ":" ";") also splits the drive letter of an absolute
+    # Windows path - "en:D:/a/.../en.ts" becomes "en;D;/a/.../en.ts", so
+    # FM_TS_FILE ends up as "D" and CMake resolves it against the source
+    # directory, which is exactly how ninja failed with
+    #   ninja: error: 'src/app/D', needed by 'src/app/fmplayeranalyzer_en.qm'
+    string(FIND "${FM_ENTRY}" ":" FM_SEPARATOR)
+    if(FM_SEPARATOR LESS 0)
+        message(FATAL_ERROR "FM_TRANSLATIONS expects <language>:<path>, got: ${FM_ENTRY}")
+    endif()
+    string(SUBSTRING "${FM_ENTRY}" 0 ${FM_SEPARATOR} FM_LANGUAGE)
+    math(EXPR FM_PATH_START "${FM_SEPARATOR} + 1")
+    string(SUBSTRING "${FM_ENTRY}" ${FM_PATH_START} -1 FM_TS_FILE)
+
     set(FM_QM_FILE ${CMAKE_CURRENT_BINARY_DIR}/fmplayeranalyzer_${FM_LANGUAGE}.qm)
+    # The .qm compiler is only a dependency when it is actually used; with Qt's
+    # lrelease the variable is empty and an empty element in DEPENDS is at best
+    # noise.
+    set(FM_QM_DEPENDS ${FM_TS_FILE})
+    if(FM_QM_TOOL)
+        list(APPEND FM_QM_DEPENDS ${FM_QM_TOOL})
+    endif()
     add_custom_command(
         OUTPUT ${FM_QM_FILE}
         COMMAND ${FM_LRELEASE_COMMAND} ${FM_TS_FILE} -qm ${FM_QM_FILE}
-        DEPENDS ${FM_TS_FILE} ${FM_QM_TOOL}
+        DEPENDS ${FM_QM_DEPENDS}
         VERBATIM
         COMMENT "Compiling ${FM_LANGUAGE} translation"
     )

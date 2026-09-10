@@ -23,6 +23,7 @@
 // stores poolOffset >> 1 (the pool starts with a 2-byte zero entry at offset 0).
 //
 // Usage: node tools/build-qm.mjs <in.ts> <out.qm> [--verify]
+//        node tools/build-qm.mjs <in.ts> -qm <out.qm> [--verify]   (lrelease style)
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -320,11 +321,17 @@ const invokedDirectly = (() => {
     }
 })();
 if (invokedDirectly) {
-    const input = process.argv[2];
-    const output = process.argv[3];
     const verify = process.argv.includes('--verify');
+    const positional = process.argv.slice(2).filter((arg) => arg !== '--verify');
+    // CMake feeds the same command line to Qt's lrelease and to this compiler
+    // ("<ts> -qm <qm>"), so both argument shapes must work. Without this the
+    // fallback build wrote the .qm to a file literally named "-qm" and the
+    // expected output never appeared.
+    const qmFlag = positional.indexOf('-qm');
+    const input = qmFlag > 0 ? positional[qmFlag - 1] : positional[0];
+    const output = qmFlag >= 0 ? positional[qmFlag + 1] : positional[1];
     if (!input || !output) {
-        console.error('usage: node tools/build-qm.mjs <in.ts> <out.qm> [--verify]');
+        console.error('usage: node tools/build-qm.mjs <in.ts> [<out.qm>|-qm <out.qm>] [--verify]');
         process.exit(2);
     }
     const xml = readFileSync(input, 'utf8');
